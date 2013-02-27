@@ -154,7 +154,7 @@ class DB extends Error{
         // build the WHERE portion of the query
         $this->build_where($where);
         
-        $this->sql.' '.$extra;
+        $this->sql=$this->sql.' '.$extra;
         $ret=$this->query($this->sql,$this->replace);
         return $ret;
     }
