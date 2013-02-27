@@ -130,7 +130,7 @@ class DB extends Error{
     
     // select and return only one row
     function select_one($table,$vals='*',$where=array(),$extra=''){
-        $s=$this->select($table,$vals,$where);
+        $s=$this->select($table,$vals,$where,$extra);
         return $s[0];
     }
     
