@@ -1,11 +1,15 @@
 <?php
 
 class Error{    
+    
     // store errors
+    private $errors = array();
+    
+    // add errors
     protected function add_error($code,$str){
         $this->errors[$code]=$str;
     }
-    // retrieve errors
+    // get errors
     function get_errors(){
         return $this->errors;
     }
