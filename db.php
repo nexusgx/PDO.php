@@ -21,6 +21,7 @@ class DB extends Error{
     private $sql='';
     public $debug=false;
     private $replace=array();
+    public $lastInsertId='';
     
     
     // initialize connection
@@ -181,6 +182,7 @@ class DB extends Error{
         // run and return the query
         $ret=$this->query($this->sql,$this->replace);
         $id=$this->db->lastInsertId();
+        $this->lastInsertId=$id;
         
         if($id)
             return $id;
@@ -227,19 +229,20 @@ class DB extends Error{
     function get_count($table,$where=false){
         
         // start query
-        $this->sql="SELECT COUNT(*) FROM ".$table;
+        $this->sql="SELECT COUNT(*) c FROM ".$table;
         
         // build the WHERE portion of the query
         if($where)
             $this->build_where($where);
-        
+            
         // run and return the query
-        $sth=$this->db->prepare($query);
-        if($vals)
-            $sth->execute($vals);
+        $sth=$this->db->prepare($this->sql);
+        if($this->replace)
+            $sth->execute($this->replace);
         
-        // return the row count
-        return $sth->rowCount();
+        //get and return the count
+        $result=$sth->fetchAll(PDO::FETCH_OBJ);
+        return $result[0]->c;
     }
     
     // gets value of requested column
