@@ -18,6 +18,9 @@ define('DB_NAME','MyDatabase');
 //instantiate class
 $database = new DB();
 
+
+//------------METHODS
+
 //select all rows in a table
 $database->select('MyDatabaseTable');
 
@@ -58,6 +61,12 @@ $database->get_value('MyDatabaseTable','name',array('id'=>1));
 //run your own query; NOT AS SECURE AS USING THE OTHER FUNCTIONS
 $database->query("SELECT * FROM MyDatabaseTable WHERE id=1");
 
-//debugging
+
+//------------PROPERTIES
+
+//the last inserted id
+$database->lastInsertId;
+
+//turn on debugging
 $database->debug=true;
 `````
