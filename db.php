@@ -251,7 +251,8 @@ class DB extends Error{
         $o=$this->select($table,$val,$where);
         
         // convert first object in associative array to array
-        $v=get_object_vars($o[0]);
+        if($o)
+            $v=get_object_vars($o[0]);
         
         // return requested value
         return $v[$val];
