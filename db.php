@@ -76,11 +76,11 @@ class DB extends Error{
     private function prep_vars($vars){
         if(is_array($vars)){
             foreach($vars as $key=>$value)
-                $ret[$key]=prep_vars($value);
+                $ret[$key]=$this->prep_vars($value);
         }
         elseif(is_object($vars)){
             foreach($vars as $key=>$value)
-                $ret->$key=prep_vars($value);
+                $ret->$key=$this->prep_vars($value);
         }
         elseif(is_string($vars)){
             $ret=stripslashes($vars);
