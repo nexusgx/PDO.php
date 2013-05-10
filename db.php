@@ -108,8 +108,14 @@ class DB extends Error{
         else
             $sth->execute();
         
-        // grab
-        $result=$sth->fetchAll(PDO::FETCH_OBJ);
+        if (substr($query,0,6)=="SELECT") {
+            //grab
+            $result=$sth->fetchAll(PDO::FETCH_OBJ);
+        }
+        else {
+            //return number of affected rows if not a SELECT query
+            $result=$sth->rowCount();
+        } 
         
         // find the fail
         $e=$sth->errorInfo();
