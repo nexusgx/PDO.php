@@ -79,6 +79,7 @@ class DB extends Error{
                 $ret[$key]=$this->prep_vars($value);
         }
         elseif(is_object($vars)){
+            $ret=new stdClass();
             foreach($vars as $key=>$value)
                 $ret->$key=$this->prep_vars($value);
         }
@@ -134,13 +135,13 @@ class DB extends Error{
     }
     
     // select and return only one row
-    function select_one($table,$vals='*',$where=array(),$extra=''){
+    function select_one($table,$vals='*',$where=array(false),$extra=''){
         $s=$this->select($table,$vals,$where,$extra);
         return $s[0];
     }
     
     // select function
-    function select($table,$vals='*',$where=array(),$extra=''){
+    function select($table,$vals='*',$where=array(false),$extra=''){
         // initialize the sql query
         $this->replace=array();
         $this->sql="SELECT ";
@@ -191,7 +192,7 @@ class DB extends Error{
     }
     
     // update
-    function update($table,$vals,$where=array()){
+    function update($table,$vals,$where=array(false)){
         // empty the replace array
         $this->replace=array();
         
@@ -226,7 +227,7 @@ class DB extends Error{
     }
     
     // get the number of records matching the requirements
-    function get_count($table,$where=false){
+    function get_count($table,$where=array(false)){
         
         // start query
         $this->sql="SELECT COUNT(*) c FROM ".$table;
@@ -246,7 +247,7 @@ class DB extends Error{
     }
     
     // gets value of requested column
-    function get_value($table,$val,$where=array()){
+    function get_value($table,$val,$where=array(false)){
         // run query
         $o=$this->select($table,$val,$where);
         
