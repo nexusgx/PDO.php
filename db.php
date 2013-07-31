@@ -22,6 +22,7 @@ class DB extends Error{
     public $debug=false;
     private $replace=array();
     public $lastInsertId='';
+    public $return_type='object';
     
     
     // initialize connection
@@ -110,7 +111,10 @@ class DB extends Error{
         
         if (substr($query,0,6)=="SELECT") {
             //grab
-            $result=$sth->fetchAll(PDO::FETCH_OBJ);
+            if($this->return_type=='object')
+                $result=$sth->fetchAll(PDO::FETCH_OBJ);
+            else
+                $result=$sth->fetchAll(PDO::FETCH_ASSOC);
         }
         else {
             //return number of affected rows if not a SELECT query
@@ -241,6 +245,9 @@ class DB extends Error{
         // build the WHERE portion of the query
         if($where)
             $this->build_where($where);
+            
+        if($this->debug)
+            $this->_get_query($this->sql,$vals,$e);
             
         // run and return the query
         $sth=$this->db->prepare($this->sql);
