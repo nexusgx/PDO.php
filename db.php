@@ -19,8 +19,9 @@ class DB extends Error{
 
     private $db;
     private $sql='';
-    public $debug=false;
     private $replace=array();
+    
+    public $debug=false;
     public $lastInsertId='';
     public $return_type='object';
     
@@ -38,6 +39,12 @@ class DB extends Error{
         }
     }
     
+    // initialize the sql query
+    private function begin_query($type){
+        $this->sql=$type.' ';
+        $this->replace=array();
+    }
+    
     private function build_where($where){
         if(!empty($where)){
             $this->sql.=" WHERE ";
@@ -49,6 +56,16 @@ class DB extends Error{
                     $this->sql.=$key.'=%:'.$c.'% && ';
                     $this->replace[':'.$c]=$w;
                 }
+                // check for null variables
+                elseif(strtolower($w)=='null' || strtolower($w)=='!null' || $w==NULL){
+                    if(substr($w,0,1)=='!')
+                        $val='IS NOT NULL';
+                    else
+                        $val='IS NULL';
+                    
+                    $this->sql.=$key.' '.$val.' && ';
+                }
+                //check for comparative symbols
                 else{
                     if(substr($w,0,2)=='<=')
                         $eq='<=';
@@ -102,13 +119,18 @@ class DB extends Error{
         }   
         // prep
         $sth=$this->db->prepare($query);
-        
+                
         // do it
-        if($vals)
-            $sth->execute($vals);
-        else
-            $sth->execute();
-        
+        if($sth){
+            if($vals)
+                $sth->execute($vals);
+            else
+                $sth->execute();
+        }
+        else{
+            $this->get_sql_error($sth,'Error executing query');
+            return false;
+        }
         if (substr($query,0,6)=="SELECT") {
             //grab
             if($this->return_type=='object')
@@ -121,26 +143,9 @@ class DB extends Error{
             $result=$sth->rowCount();
         } 
         
-        // find the fail
-        $e=$sth->errorInfo();
+        //find any errors
+        $this->get_sql_error($sth);
         
-        // catch any PDO errors and log them
-        if($e[0]!='00000'){
-            if($this->debug){
-                if($e[2])
-                    echo '<strong>ERROR:</strong>: '.$e[2];
-                else
-                    echo '<strong>ERROR:</strong>: General Error';
-            }
-            else{
-                if($e[2])
-                    $this->add_error($e[0],$e[2]);
-                else
-                    $this->add_error($e[0],'General Error upon execution');
-            }
-        }
-        if($this->debug)
-            $this->_get_query($query,$vals,$e);
         return $this->prep_vars($result);
     }
     
@@ -153,8 +158,7 @@ class DB extends Error{
     // select function
     function select($table,$vals='*',$where=array(false),$extra=''){
         // initialize the sql query
-        $this->replace=array();
-        $this->sql="SELECT ";
+        $this->begin_query('SELECT');
         
         // add all the values to be selected 
         if(is_array($vals)){
@@ -177,10 +181,7 @@ class DB extends Error{
     
     // insert
     function insert($table,$vals){
-        // empty the replace array
-        $this->replace=array();
-        
-        $this->sql="INSERT INTO ".$table." SET ";
+        $this->begin_query('INSERT INTO '.$table.' SET');
         
         // build the replace array and the query
         $c=count($this->replace);
@@ -203,10 +204,7 @@ class DB extends Error{
     
     // update
     function update($table,$vals,$where=array(false)){
-        // empty the replace array
-        $this->replace=array();
-        
-        $this->sql="UPDATE ".$table." SET ";
+        $this->begin_query('UPDATE '.Table.' SET');
         
         // build the replace array and the query
         $c=count($this->replace);
@@ -224,10 +222,7 @@ class DB extends Error{
         return $this->query($this->sql,$this->replace);
     }
     function delete($table,$where){
-        // empty the replace array
-        $this->replace=array();
-        
-        $this->sql="DELETE FROM ".$table;
+        $this->begin_query('DELETE FROM');
         
         // build the WHERE portion of the query
         $this->build_where($where);
@@ -238,25 +233,31 @@ class DB extends Error{
     
     // get the number of records matching the requirements
     function get_count($table,$where=array(false)){
-        
-        // start query
-        $this->sql="SELECT COUNT(*) c FROM ".$table;
+    
+        $this->begin_query("SELECT COUNT(*) c FROM ".$table);
         
         // build the WHERE portion of the query
         if($where)
             $this->build_where($where);
-            
-        if($this->debug)
-            $this->_get_query($this->sql,$vals,$e);
-            
+        
         // run and return the query
         $sth=$this->db->prepare($this->sql);
-        if($this->replace)
-            $sth->execute($this->replace);
         
-        //get and return the count
-        $result=$sth->fetchAll(PDO::FETCH_OBJ);
-        return $result[0]->c;
+        if($sth){            
+            if($this->replace)
+                $sth->execute($this->replace);
+            else
+                $sth->execute();
+            $this->get_sql_error($sth);
+            
+            //get and return the count
+            $result=$sth->fetchAll(PDO::FETCH_OBJ);
+            return $result[0]->c;
+        }
+        else{
+            $this->get_sql_error($sth,'ERROR RETRIEVING get_count');
+            return false;
+        }
     }
     
     // gets value of requested column
@@ -272,18 +273,54 @@ class DB extends Error{
         return $v[$val];
     }
     
+    //find any errors in the mysql statement
+    private function get_sql_error($sth,$error_statement=''){
+    // find the fail
+        if($sth)
+            $e=$sth->errorInfo();
+        else
+            $e=array('db error','',$error_statement);
+        
+        // catch any PDO errors and log them
+        if($e[0]!='00000'){
+            if($this->debug){
+                if($e[2])
+                    echo '<strong>ERROR:</strong>: '.$e[2];
+                else
+                    echo '<strong>ERROR:</strong>: General Error';
+            }
+            else{
+                if($e[2])
+                    $this->add_error($e[0],$e[2]);
+                else
+                    $this->add_error($e[0],'General Error upon execution');
+            }
+        }
+        
+        if($this->debug)
+            $this->_get_query($this->sql,$this->replace,$e);
+    }
+    
     //debugging function
     private function _get_query($query,$val,$er=0){
         echo '<p>';
         if($val)
-        foreach($val as $key=>$value)
-            $query=str_replace($key,"'".$value."'",$query);
+        foreach($val as $key=>$value){
+            if(strtolower($value)=='null')
+                $query=str_replace($key,"'".$value."'",$query);
+            else
+                $query=str_replace($key,"'".$value."'",$query);
+        }
         echo '<strong>QUERY:</strong><br />'.$query;
         if($er){
             echo '<br /><br /><strong>Raw error:</strong><pre>';
             print_r($er);
             echo '</pre>';
         }
+        echo '<br /><strong>DB.php status:</strong><br /><pre>';
+        echo '$db->sql: ';print_r($this->sql);
+        echo '<br />$db->replace: ';print_r($this->replace);
+        echo '</pre>';
         echo '</p><hr />';
     }
 }
