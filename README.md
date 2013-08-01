@@ -67,6 +67,9 @@ $database->query("SELECT * FROM MyDatabaseTable WHERE id=1");
 //the last inserted id
 $database->lastInsertId;
 
+//change the return type from 'object' to 'array'
+$database->return_type='object';
+
 //turn on debugging
 $database->debug=true;
 `````
