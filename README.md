@@ -63,6 +63,8 @@ $database->get_value('MyDatabaseTable','name',array('id'=>1));
 //run your own query; NOT AS SECURE AS USING THE OTHER FUNCTIONS
 $database->query("SELECT * FROM MyDatabaseTable WHERE id=1");
 
+//securely run your own query
+$database->query("SELECT * FROM MyDatabaseTable WHERE id=:id",array(':id'=>1));
 
 //------------PROPERTIES
 
