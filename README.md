@@ -6,6 +6,8 @@ I wanted security, but I also wanted it to be easier to plug in to applications.
 
 Mind you, this is a work in progress, so if you find a security issue or any other sort of issue, please let me know.
 
+Requires PHP 5.3 or later.
+
 Usage
 ===
 `````php
