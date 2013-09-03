@@ -57,7 +57,7 @@ class DB extends Error{
                     $this->replace[':'.$c]=$w;
                 }
                 // check for null variables
-                elseif(strtolower($w)=='null' || strtolower($w)=='!null' || $w==NULL){
+                elseif(strtolower($w)=='null' || strtolower($w)=='!null' || $w===NULL){
                     if(substr($w,0,1)=='!')
                         $val='IS NOT NULL';
                     else
