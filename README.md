@@ -1,4 +1,4 @@
-PDO
+PDO.php
 ===
 I had been wanting to get away from the standard MySQL classes for awhile. I knew they were inherently less secure, but part of moving to something different i meant that I would have to change the way I work with the database.
 
