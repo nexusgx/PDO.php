@@ -273,6 +273,29 @@ class DB extends Error{
         return $v[$val];
     }
     
+     // get the column names from a table
+    function get_column_names($table){
+        $this->info->running=1;
+        $this->info->func='$db->get_columns';
+        $this->info->vars=array('$table'=>$table);
+
+        // temporarily change return type to get an array
+        $temp=$this->return_type;
+        $this->return_type='array';
+        
+        $ret=$this->select_one($table,'*','','LIMIT 1');
+        
+        // change return type back
+        $this->return_type=$temp;
+        
+        // grab names
+        $fin=array();
+        foreach($ret as $key=>$r)
+            $fin[]=$key;
+            
+        return $fin;
+    }
+    
     //find any errors in the mysql statement
     private function get_sql_error($sth,$error_statement=''){
     // find the fail
