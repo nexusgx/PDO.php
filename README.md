@@ -60,6 +60,9 @@ $database->get_count('MyDatabaseTable',array(id=>1));
 //select a single value from a table
 $database->get_value('MyDatabaseTable','name',array('id'=>1));
 
+//get an array of the column names of a table
+$database->get_value('MyDatabaseTable');
+
 //run your own query; NOT AS SECURE AS USING THE OTHER FUNCTIONS
 $database->query("SELECT * FROM MyDatabaseTable WHERE id=1");
 
