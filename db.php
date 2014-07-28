@@ -469,37 +469,8 @@ class DB extends Error{
 		else
 			return true;
     }
-    /*
+    
     //debugging function
-    private function _get_query($query,$val,$er=0){
-        echo '<p>';
-        if($val)
-        foreach($val as $key=>$value){
-            if(strtolower($value)=='null')
-                $query=str_replace($key,"'".$value."'",$query);
-            else
-                $query=str_replace($key,"'".$value."'",$query);
-        }
-        echo '<strong>QUERY:</strong><br />'.$query;
-        if($er){
-            echo '<br /><br /><strong>Raw error:</strong><pre>';
-			if($er[0]!='00000')
-				print_r($er);
-			else
-				echo 'no error';
-            echo '</pre>';
-        }
-        echo '<br /><strong>Function used:</strong> '.$this->info->func.'<br />';
-        echo '<br /><strong>Passed variables used:</strong><br /><pre>';
-        print_r($this->info->vars);
-        //foreach($this->info->vars as $key=>$v){echo $key.': '; var_dump($v);}
-        echo '</pre>';
-        echo '<br /><strong>DB.php status:</strong><br /><pre>';
-        echo '$db->sql: ';print_r($this->sql);
-        echo '<br />$db->replace: ';print_r($this->replace);
-        echo '</pre>';
-        echo '</p><hr />';
-    }*/
     private function _get_query($query,$val,$er=0){
         $html= '';
         if($val)
