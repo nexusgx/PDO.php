@@ -74,9 +74,32 @@ $database->query("SELECT * FROM MyDatabaseTable WHERE id=:id",array(':id'=>1));
 //the last inserted id
 $database->lastInsertId;
 
+//the number of rows affected by the query
+$database->rowsAffected=0;
+
 //change the return type from 'object' to 'array'
 $database->return_type='object';
 
 //turn on debugging
 $database->debug=true;
+`````
+
+Using WHERE
+===
+To select records based on criteria, you have some options in how to select them. The $where array you provide to a method can be constructed in a few different ways to get the results you are looking for.
+
+`````php
+<?php
+
+//use MySQL syntax in filtering your results instead of a direct value
+//this option does bypass any PDO security in place, so please use carefully
+$where=array('field1/func'=>'field2+1');
+
+//search for null
+$where=array('field1'=>null);
+
+//use different MySQL comparative fields; currently works with !=<> and LIKE
+$where=array('field1/%LIKE%'=>'value');
+
+?>
 `````
