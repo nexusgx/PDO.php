@@ -61,7 +61,7 @@ $database->get_count('MyDatabaseTable',array(id=>1));
 $database->get_value('MyDatabaseTable','name',array('id'=>1));
 
 //get an array of the column names of a table
-$database->get_value('MyDatabaseTable');
+$database->get_column_names('MyDatabaseTable');
 
 //run your own query; NOT AS SECURE AS USING THE OTHER FUNCTIONS
 $database->query("SELECT * FROM MyDatabaseTable WHERE id=1");
