@@ -20,9 +20,11 @@ class DB extends Error{
     private $db;
     private $sql='';
     private $replace=array();
+    private $info; //for debug information
     
     public $debug=false;
-    public $lastInsertId='';
+    public $lastInsertId='0';
+	public $rowsAffected=0;
     public $return_type='object';
     
     
@@ -37,10 +39,12 @@ class DB extends Error{
             print "Error!: " . $e->getMessage() . "<br/>";
             die();
         }
+        $this->info=new stdClass();
     }
     
     // initialize the sql query
     private function begin_query($type){
+        $this->errors=array();
         $this->sql=$type.' ';
         $this->replace=array();
     }
@@ -48,45 +52,110 @@ class DB extends Error{
     private function build_where($where){
         if(!empty($where)){
             $this->sql.=" WHERE ";
-            $c=count($this->replace);
-            foreach($where as $key=>$w){
-                // look for any comparitive symbols within the where array value.
-                if(substr($w,0,1)=='%'){
-                    // prep the query for PDO->prepare
-                    $this->sql.=$key.'=%:'.$c.'% && ';
-                    $this->replace[':'.$c]=$w;
-                }
-                // check for null variables
-                elseif(strtolower($w)=='null' || strtolower($w)=='!null' || $w===NULL){
-                    if(substr($w,0,1)=='!')
-                        $val='IS NOT NULL';
-                    else
-                        $val='IS NULL';
+            if(is_array($where)){
+                $c=count($this->replace);
+                foreach($where as $key=>$w){
+                    // checks the array key for a slash and then the operator (eg. id/%LIKE%)
+                    $op=substr(strstr($key,'/'),1);
                     
-                    $this->sql.=$key.' '.$val.' && ';
-                }
-                //check for comparative symbols
-                else{
-                    if(substr($w,0,2)=='<=')
-                        $eq='<=';
-                    elseif(substr($w,0,2)=='>=')
-                        $eq='>=';
-                    elseif(substr($w,0,1)=='>')
-                        $eq='>';
-                    elseif(substr($w,0,1)=='<')
-                        $eq='<';
-                    elseif(substr($w,0,1)=='!')
-                        $eq='!=';
-                    else
-                        $eq='=';
+                    // check for null variables
+                    if(strtolower($w)=='null' || strtolower($w)=='!null' || $w===NULL){
+                        if($op=='!=')
+                            $val='IS NOT NULL';
+                        else
+                            $val='IS NULL';
+                        
+                        $this->sql.=$key.' '.$val.' && ';
+                    }
+                    // look for any comparitive symbols within the where array.
+                    elseif($op!=''){
+                        $key=strstr($key,'/',true);
+                        switch($op){
+                            case '%LIKE%':
+                                $eq=' LIKE ';
+                                $w='%'.$w.'%';
+                            break;
+                            case '%LIKE':
+                                $eq=' LIKE ';
+                                $w='%'.$w;
+                            break;
+                            case 'LIKE%':
+                                $eq=' LIKE ';
+                                $w=$w.'%';
+                            break;
+                            case '%NOTLIKE%':
+                                $eq=' NOT LIKE ';
+                                $w='%'.$w.'%';
+                            break;
+                            case '%NOTLIKE':
+                                $eq=' NOT LIKE ';
+                                $w='%'.$w;
+                            break;
+                            case 'NOTLIKE%':
+                                $eq=' NOT LIKE ';
+                                $w=$w.'%';
+                            break;
+                            default:
+                                $eq=$op;
+                            break;
+                        }
+                        
+                        // prep the query for PDO->prepare
+						if($op=='col'){
+							//ignore replacement if comparing to another table column
+							$this->sql.=$key.'='.$w.' && ';
+						}
+						else{
+							$this->sql.=$key.$eq.':'.$c.' && ';
+							$this->replace[':'.$c]=$w;
+						}
+                    }
+                    elseif(substr($w,0,1)=='%'){
+                        // prep the query for PDO->prepare
+                        $this->sql.=$key.'=%:'.$c.'% && ';
+                        $this->replace[':'.$c]=$w;
+                    }
                     
-                    // prep the query for PDO->prepare
-                    $this->sql.=$key.$eq.':'.$c.' && ';
-                    $this->replace[':'.$c]=$w;
+                    //check for comparative symbols
+                    //RETAIN FOR BACKWARDS COMPATIBILITY
+                    else{
+                        if(substr($w,0,2)=='<='){
+                            $eq='<=';
+                            $w=substr($w,2);
+                        }
+                        elseif(substr($w,0,2)=='>='){
+                            $eq='>=';
+                            $w=substr($w,2);
+                        }
+                        elseif(substr($w,0,1)=='>'){
+                            $eq='>';
+                            $w=substr($w,1);
+                        }
+                        elseif(substr($w,0,1)=='<'){
+                            $eq='<';
+                            $w=substr($w,1);
+                        }
+                        elseif(substr($w,0,1)=='!'){
+                            $eq='!=';
+                            $w=substr($w,1);
+                        }
+                        else{
+                            $eq='=';
+                        }
+                            
+                        
+                        
+                        // prep the query for PDO->prepare
+                        $this->sql.=$key.$eq.':'.$c.' && ';
+                        $this->replace[':'.$c]=$w;
+                    }
+                    $c++;
                 }
-                $c++;
+                $this->sql=substr($this->sql,0,-4);
             }
-            $this->sql=substr($this->sql,0,-4);
+            elseif(is_string($where)){
+                $this->sql.=$where;
+            }
         }
     }
     
@@ -110,8 +179,16 @@ class DB extends Error{
         return $ret;
     }
     
+    
     // general query function
     function query($query,$vals=''){
+        if($this->info->running==0){
+            $this->info->running=1;
+            $this->info->func='$db->query';
+            $this->info->vars=array('$query'=>$query,'$vals'=>$vals);
+        }
+        
+    
         // double check the database connection object is working
         if(!$this->db){
             $this->add_error('000','Database connection failed.');
@@ -119,44 +196,69 @@ class DB extends Error{
         }   
         // prep
         $sth=$this->db->prepare($query);
-                
+        
         // do it
         if($sth){
             if($vals)
-                $sth->execute($vals);
+                $pass=$sth->execute($vals);
             else
-                $sth->execute();
+                $pass=$sth->execute();
         }
         else{
+            $this->info->running=0;
             $this->get_sql_error($sth,'Error executing query');
             return false;
         }
-        if (substr($query,0,6)=="SELECT") {
-            //grab
-            if($this->return_type=='object')
-                $result=$sth->fetchAll(PDO::FETCH_OBJ);
-            else
-                $result=$sth->fetchAll(PDO::FETCH_ASSOC);
+        if($pass){
+            if (substr($query,0,6)=="SELECT") {
+                //grab
+                if($this->return_type=='object')
+                    $result=$sth->fetchAll(PDO::FETCH_OBJ);
+                else
+                    $result=$sth->fetchAll(PDO::FETCH_ASSOC);
+            }
+            else {
+                //return number of affected rows if not a SELECT query
+                $result=true;
+            } 
+            
+			$this->rowsAffected=$sth->rowCount();
+			
+            //find any errors
+            $er=$this->get_sql_error($sth);
+            
+            $this->info->running=0;
+			
+			//fail the whole thing if there's an error
+			if($er)
+				return false;
+				
+            return $this->prep_vars($result);
         }
-        else {
-            //return number of affected rows if not a SELECT query
-            $result=$sth->rowCount();
-        } 
-        
-        //find any errors
-        $this->get_sql_error($sth);
-        
-        return $this->prep_vars($result);
+        else return false;
     }
     
+    
     // select and return only one row
-    function select_one($table,$vals='*',$where=array(false),$extra=''){
+    function select_one($table,$vals='*',$where=false,$extra=''){
+        $this->info->running=1;
+        $this->info->func='$db->select_one';
+        $this->info->vars=array('$table'=>$table,'$vals'=>$vals,'$where'=>$where,'$extra'=>$extra);
+        
         $s=$this->select($table,$vals,$where,$extra);
-        return $s[0];
+		if($s===false)
+			return false;
+		else
+			return $s[0];
     }
     
     // select function
-    function select($table,$vals='*',$where=array(false),$extra=''){
+    function select($table,$vals='*',$where=false,$extra=''){
+        if($this->info->running==0){
+            $this->info->running=1;
+            $this->info->func='$db->select';
+            $this->info->vars=array('$table'=>$table,'$vals'=>$vals,'$where'=>$where,'$extra'=>$extra);
+        }
         // initialize the sql query
         $this->begin_query('SELECT');
         
@@ -181,14 +283,23 @@ class DB extends Error{
     
     // insert
     function insert($table,$vals){
+        $this->info->running=1;
+        $this->info->func='$db->insert';
+        $this->info->vars=array('$table'=>$table,'$vals'=>$vals);
+        
         $this->begin_query('INSERT INTO '.$table.' SET');
         
         // build the replace array and the query
         $c=count($this->replace);
         foreach($vals as $key=>$v){
-            $this->sql.=$key.'=:'.$c.', ';
-            $this->replace[':'.$c]=$v;
-            $c++;
+			if(strstr($key,'/func')){
+				$this->sql.=str_replace('/func','',$key).'='.$v.', ';
+			}
+			else{
+				$this->sql.=$key.'=:'.$c.', ';
+				$this->replace[':'.$c]=$v;
+				$c++;
+			}
         }
         $this->sql=substr($this->sql,0,-2);
         // run and return the query
@@ -203,15 +314,24 @@ class DB extends Error{
     }
     
     // update
-    function update($table,$vals,$where=array(false)){
-        $this->begin_query('UPDATE '.Table.' SET');
+    function update($table,$vals,$where=false){
+        $this->info->running=1;
+        $this->info->func='$db->update';
+        $this->info->vars=array('$table'=>$table,'$vals'=>$vals,'$where'=>$where);
+        
+        $this->begin_query('UPDATE '.$table.' SET');
         
         // build the replace array and the query
         $c=count($this->replace);
         foreach($vals as $key=>$v){
-            $this->sql.=$key.'=:'.$c.', ';
-            $this->replace[':'.$c]=$v;
-            $c++;
+			if(strstr($key,'/func')){
+				$this->sql.=str_replace('/func','',$key).'='.$v.', ';
+			}
+			else{
+				$this->sql.=$key.'=:'.$c.', ';
+				$this->replace[':'.$c]=$v;
+				$c++;
+			}
         }
         $this->sql=substr($this->sql,0,-2);
         
@@ -222,7 +342,11 @@ class DB extends Error{
         return $this->query($this->sql,$this->replace);
     }
     function delete($table,$where){
-        $this->begin_query('DELETE FROM');
+        $this->info->running=1;
+        $this->info->func='$db->delete';
+        $this->info->vars=array('$table'=>$table,'$where'=>$where);
+    
+        $this->begin_query('DELETE FROM '.$table);
         
         // build the WHERE portion of the query
         $this->build_where($where);
@@ -232,9 +356,18 @@ class DB extends Error{
     }
     
     // get the number of records matching the requirements
-    function get_count($table,$where=array(false)){
-    
+    function get_count($table,$where=false){
+        $this->info->running=1;
+        $this->info->func='$db->get_count';
+        $this->info->vars=array('$table'=>$table,'$where'=>$where);
+        
         $this->begin_query("SELECT COUNT(*) c FROM ".$table);
+        
+        // double check the database connection object is working
+        if(!$this->db){
+            $this->add_error('000','Database connection failed.');
+            return false;
+        }   
         
         // build the WHERE portion of the query
         if($where)
@@ -252,16 +385,22 @@ class DB extends Error{
             
             //get and return the count
             $result=$sth->fetchAll(PDO::FETCH_OBJ);
+            $this->info->running=0;
             return $result[0]->c;
         }
         else{
+            $this->info->running=0;
             $this->get_sql_error($sth,'ERROR RETRIEVING get_count');
             return false;
         }
     }
     
     // gets value of requested column
-    function get_value($table,$val,$where=array(false)){
+    function get_value($table,$val,$where=false){
+        $this->info->running=1;
+        $this->info->func='$db->get_value';
+        $this->info->vars=array('$table'=>$table,'$vals'=>$vals,'$where'=>$where);
+        
         // run query
         $o=$this->select($table,$val,$where);
         
@@ -273,7 +412,7 @@ class DB extends Error{
         return $v[$val];
     }
     
-     // get the column names from a table
+    // get the column names from a table
     function get_column_names($table){
         $this->info->running=1;
         $this->info->func='$db->get_columns';
@@ -322,8 +461,15 @@ class DB extends Error{
         
         if($this->debug)
             $this->_get_query($this->sql,$this->replace,$e);
+        
+        $this->info->func='';
+        $this->info->vars=array();
+		if($e[0]=='00000')
+			return false;
+		else
+			return true;
     }
-    
+    /*
     //debugging function
     private function _get_query($query,$val,$er=0){
         echo '<p>';
@@ -337,14 +483,57 @@ class DB extends Error{
         echo '<strong>QUERY:</strong><br />'.$query;
         if($er){
             echo '<br /><br /><strong>Raw error:</strong><pre>';
-            print_r($er);
+			if($er[0]!='00000')
+				print_r($er);
+			else
+				echo 'no error';
             echo '</pre>';
         }
+        echo '<br /><strong>Function used:</strong> '.$this->info->func.'<br />';
+        echo '<br /><strong>Passed variables used:</strong><br /><pre>';
+        print_r($this->info->vars);
+        //foreach($this->info->vars as $key=>$v){echo $key.': '; var_dump($v);}
+        echo '</pre>';
         echo '<br /><strong>DB.php status:</strong><br /><pre>';
         echo '$db->sql: ';print_r($this->sql);
         echo '<br />$db->replace: ';print_r($this->replace);
         echo '</pre>';
         echo '</p><hr />';
+    }*/
+    private function _get_query($query,$val,$er=0){
+        $html= '';
+        if($val)
+        foreach($val as $key=>$value){
+            if(strtolower($value)=='null')
+                $query=str_replace($key,"'".$value."'",$query);
+            else
+                $query=str_replace($key,"'".$value."'",$query);
+        }
+        $html.= '<strong>QUERY:</strong><br />'.$query;
+        if($er){
+            $html.= '<br /><br /><strong>Raw error:</strong><pre>';
+			if($er[0]!='00000')
+				$html.=print_r($er,true);
+			else
+				$html.= 'no error';
+            $html.= '</pre>';
+        }
+        $html.= '<br /><strong>Function used:</strong> '.$this->info->func.'<br />';
+        $html.= '<br /><strong>Passed variables used:</strong><br /><pre>';
+        $html.=print_r($this->info->vars,true);
+        $html.= '</pre>';
+        $html.= '<br /><strong>DB.php status:</strong><br /><pre>';
+        $html.= '$db->sql: '.print_r($this->sql,true);
+        $html.= '<br />$db->replace: '.print_r($this->replace,true);
+        $html.= '</pre>';
+        $this->_show_debug($this->info->func.' error',$html);
+    }
+    function _show_debug($title,$content){
+        $html= '<p>';
+        $html.='<h2>'.$title.'</h2>';
+        $html.=$content;
+        $html.= '</p><hr />';
+        echo $html;
     }
 }
 
