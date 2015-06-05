@@ -248,6 +248,19 @@ class DB extends Error{
         else return false;
     }
     
+    //do the results return any rows
+    function exists($table,$where=false){
+        $this->info->running=1;
+        $this->info->func='$db->exists';
+        $this->info->vars=array('$table'=>$table,'$where'=>$where);
+        
+        $num=$this->get_count($table,$where);
+        if($num > 0)
+            return true;
+        else
+            return false;
+
+    }
     
     // select and return only one row
     function select_one($table,$vals='*',$where=false,$extra=''){
