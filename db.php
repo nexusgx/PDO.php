@@ -23,6 +23,7 @@ class DB extends Error{
     private $info; //for debug information
     private $alternate_begin='';
     
+    public $debug_formatted=false;
     public $debug=false;
     public $lastInsertId='0';
     public $rowsAffected=0;
@@ -217,7 +218,7 @@ class DB extends Error{
         }
         else{
             $this->info->running=0;
-            $this->get_sql_error($sth,'Error executing query');
+            $this->get_sql_error($this->db->errorInfo(),'Error executing query');
             return false;
         }
         if($pass){
@@ -236,7 +237,7 @@ class DB extends Error{
 			$this->rowsAffected=$sth->rowCount();
 			
             //find any errors
-            $er=$this->get_sql_error($sth);
+            $er=$this->get_sql_error(array('000000'));
             
             $this->info->running=0;
 			
@@ -246,7 +247,10 @@ class DB extends Error{
 				
             return $this->prep_vars($result);
         }
-        else return false;
+        else{ 
+            $this->get_sql_error(false,'Error executing query');
+            return false;
+        };
     }
     
     //do the results return any rows
@@ -495,30 +499,35 @@ class DB extends Error{
     }
     
     //find any errors in the mysql statement
-    private function get_sql_error($sth,$error_statement=''){
+    private function get_sql_error($error,$error_statement=''){
     // find the fail
-        if($sth)
-            $e=$sth->errorInfo();
+        if($error)
+            $e=array($error[0],$error[1],'['.$error[0].'] '.$error[2]);
+
+
         else
             $e=array('db error','',$error_statement);
         
         // catch any PDO errors and log them
         if($e[0]!='00000'){
-            if($this->debug){
-                if($e[2])
-                    echo '<strong>ERROR:</strong>: '.$e[2];
-                else
-                    echo '<strong>ERROR:</strong>: General Error';
-            }
-            else{
-                if($e[2])
-                    $this->add_error($e[0],$e[2]);
-                else
-                    $this->add_error($e[0],'General Error upon execution');
-            }
+            if($e[2])
+
+
+
+
+
+
+
+
+                $this->add_error($e[0],$e[2]);
+            else
+
+                $this->add_error($e[0],'General Error upon execution');
+
         }
         
-        if($this->debug)
+        if($this->debug || $this->debug_formatted)
+
             $this->_get_query($this->sql,$this->replace,$e);
         
         $this->info->func='';
@@ -531,23 +540,33 @@ class DB extends Error{
     
     //debugging function
     private function _get_query($query,$val,$er=0){
-        $html= '';
+
         if($val)
         foreach($val as $key=>$value){
             if(strtolower($value)=='null')
-                $query=str_replace($key,"'".$value."'",$query);
+                $query=str_replace('='.$key,"='".$value."'",$query);
             else
-                $query=str_replace($key,"'".$value."'",$query);
+                $query=str_replace('='.$key,"='".$value."'",$query);
         }
-        $html.= '<strong>QUERY:</strong><br />'.$query;
+
         if($er){
-            $html.= '<br /><br /><strong>Raw error:</strong><pre>';
-			if($er[0]!='00000')
-				$html.=print_r($er,true);
-			else
-				$html.= 'no error';
-            $html.= '</pre>';
+
+			if($er[0]!='00000'){
+				$error=$er[2];
+                $pass=false;
+            }
+
+			else{
+				$error= 'no error';
+                $pass=true;
+            }
+
         }
+        $html= '';
+        $html.= '<strong>QUERY:</strong><br />'.$query;
+        if(!$pass)
+            $html.= '<br /><br /><strong>Error:</strong><pre>'.$error.'</pre>';
+        
         $html.= '<br /><strong>Function used:</strong> '.$this->info->func.'<br />';
         $html.= '<br /><strong>Passed variables used:</strong><br /><pre>';
         $html.=print_r($this->info->vars,true);
@@ -556,13 +575,26 @@ class DB extends Error{
         $html.= '$db->sql: '.print_r($this->sql,true);
         $html.= '<br />$db->replace: '.print_r($this->replace,true);
         $html.= '</pre>';
-        $this->_show_debug($this->info->func.' error',$html);
+        
+        $this->_show_debug($this->info->func,$html,$pass);
     }
-    function _show_debug($title,$content){
-        $html= '<p>';
-        $html.='<h2>'.$title.'</h2>';
-        $html.=$content;
-        $html.= '</p><hr />';
+    function _show_debug($title,$content,$pass=true){
+        $html='';
+        
+        if(!$this->debug_formatted){
+            $html="$title \r\n".strip_tags(str_replace(array('<br />','</div>','</h2>'),"\r\n",$content))."\r\n";
+            $html.='-----------------------------------'."\r\n";
+        }
+        else{
+            if($pass)
+                $html.='<div style="background-color:#CCFFCC"><h2 style="background-color:#00C200;color:#fff;">'.$title.'</h2>';
+            else
+                $html.='<div style="background-color:#FFDDDD"><h2 style="background-color:#C20000;color:#fff;">'.$title.'</h2>';
+
+
+            $html.=$content;
+            $html.= '</div><hr />';
+        }
         echo $html;
     }
 }
