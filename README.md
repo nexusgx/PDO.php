@@ -44,6 +44,8 @@ $options=array(
     name=>'test'
 );
 $database->insert('MyDatabaseTable',$options);
+    //or
+$database->insert_ignore('MyDatabaseTable',$options);
 
 //update table
 $options=array(
@@ -81,7 +83,8 @@ $database->rowsAffected=0;
 $database->return_type='object';
 
 //turn on debugging
-$database->debug=true;
+$database->debug=true; //plain text
+$database->debug_formatted=true; //html
 `````
 
 Using WHERE
