@@ -21,10 +21,11 @@ class DB extends Error{
     private $sql='';
     private $replace=array();
     private $info; //for debug information
+    private $alternate_begin='';
     
     public $debug=false;
     public $lastInsertId='0';
-	public $rowsAffected=0;
+    public $rowsAffected=0;
     public $return_type='object';
     
     
@@ -305,26 +306,46 @@ class DB extends Error{
     }
     
     // insert
-    function insert($table,$vals){
+    function insert($table,$vals,$extra=''){
         $this->info->running=1;
         $this->info->func='$db->insert';
         $this->info->vars=array('$table'=>$table,'$vals'=>$vals);
         
-        $this->begin_query('INSERT INTO '.$table.' SET');
+        if($this->alternate_begin!=''){
+            $this->begin_query($this->alternate_begin.' INTO '.$table.' SET');
+            $this->alternate_begin='';
+        }
+        else
+            $this->begin_query('INSERT INTO '.$table.' SET');
         
         // build the replace array and the query
-        $c=count($this->replace);
-        foreach($vals as $key=>$v){
-			if(strstr($key,'/func')){
-				$this->sql.=str_replace('/func','',$key).'='.$v.', ';
-			}
-			else{
-				$this->sql.=$key.'=:'.$c.', ';
-				$this->replace[':'.$c]=$v;
-				$c++;
-			}
+        if(is_array($vals)){
+            $c=count($this->replace);
+            foreach($vals as $key=>$v){
+                if(strstr($key,'/func')){
+                    $this->sql.=str_replace('/func','',$key).'='.$v.', ';
+                    unset($vals[$key]);
+                }
+                else{
+
+
+                    $this->sql.=$key.'=:'.$c.', ';
+                    if($v=='')
+                        $this->replace[':'.$c]="";
+                    else
+                        $this->replace[':'.$c]=$v;
+                    $c++;
+                }
+            }
+            $this->sql=substr($this->sql,0,-2);
         }
-        $this->sql=substr($this->sql,0,-2);
+        else{
+            $this->sql.=' '.$vals;
+
+
+        }
+        $this->sql=$this->sql.' '.$extra;
+        
         // run and return the query
         $ret=$this->query($this->sql,$this->replace);
         $id=$this->db->lastInsertId();
@@ -334,6 +355,11 @@ class DB extends Error{
             return $id;
         else
             return $ret;
+    }
+    
+    function insert_ignore($table,$vals){
+        $this->alternate_begin='INSERT IGNORE';
+        $this->insert($table,$vals);
     }
     
     // update
