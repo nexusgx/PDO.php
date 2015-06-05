@@ -371,18 +371,28 @@ class DB extends Error{
         $this->begin_query('UPDATE '.$table.' SET');
         
         // build the replace array and the query
-        $c=count($this->replace);
-        foreach($vals as $key=>$v){
-			if(strstr($key,'/func')){
-				$this->sql.=str_replace('/func','',$key).'='.$v.', ';
-			}
-			else{
-				$this->sql.=$key.'=:'.$c.', ';
-				$this->replace[':'.$c]=$v;
-				$c++;
-			}
+        if(is_array($vals)){
+            $c=count($this->replace);
+            foreach($vals as $key=>$v){
+            	//if a function is detected, bypass the replacement
+                if(strstr($key,'/func')){
+                    $this->sql.=str_replace('/func','',$key).'='.$v.', ';
+                    unset($vals[$key]);
+                }
+                else{
+                    $this->sql.=$key.'=:'.$c.', ';
+                    if($v=='')
+                        $this->replace[':'.$c]="";
+                    else
+                        $this->replace[':'.$c]=$v;
+                    $c++;
+                }
+            }
+            $this->sql=substr($this->sql,0,-2);
         }
-        $this->sql=substr($this->sql,0,-2);
+        else{
+            $this->sql.=' '.$vals;
+        }
         
         // build the WHERE portion of the query
         $this->build_where($where);
