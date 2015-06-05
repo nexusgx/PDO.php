@@ -67,6 +67,16 @@ class DB extends Error{
                         
                         $this->sql.=$key.' '.$val.' && ';
                     }
+                    //check for an empty string
+                    elseif($op=='empty'){
+                        $key=strstr($key,'/',true);
+						$this->sql.=$key.'="" && ';
+                    }
+                    //check for an non-empty string
+                    elseif($op=='notempty'){
+                        $key=strstr($key,'/',true);
+						$this->sql.=$key.'!="" && ';
+                    }
                     // look for any comparitive symbols within the where array.
                     elseif($op!=''){
                         $key=strstr($key,'/',true);
