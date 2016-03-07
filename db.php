@@ -22,12 +22,15 @@ class DB extends Error{
     private $replace=array();
     private $info; //for debug information
     private $alternate_begin='';
-    
+    private $debug_output='';
+	
     public $debug_formatted=false;
     public $debug=false;
     public $lastInsertId='0';
-    public $rowsAffected=0;
+	public $rowsAffected=0;
+    public $error_count=0;
     public $return_type='object';
+    public $raw=false; //disable prep_vars
     
     
     // initialize connection
@@ -48,6 +51,7 @@ class DB extends Error{
     private function begin_query($type){
         $this->errors=array();
         $this->sql=$type.' ';
+        $this->error_count=0;
         $this->replace=array();
     }
     
@@ -173,6 +177,9 @@ class DB extends Error{
     
     // remove slashes from all retrieved variables
     private function prep_vars($vars){
+        //return the raw dataset
+        if($this->raw) return $vars;
+        
         if(is_array($vars)){
             foreach($vars as $key=>$value)
                 $ret[$key]=$this->prep_vars($value);
@@ -252,8 +259,7 @@ class DB extends Error{
             return false;
         };
     }
-    
-    //do the results return any rows
+	
     function exists($table,$where=false){
         $this->info->running=1;
         $this->info->func='$db->exists';
@@ -264,7 +270,6 @@ class DB extends Error{
             return true;
         else
             return false;
-
     }
     
     // select and return only one row
@@ -331,8 +336,6 @@ class DB extends Error{
                     unset($vals[$key]);
                 }
                 else{
-
-
                     $this->sql.=$key.'=:'.$c.', ';
                     if($v=='')
                         $this->replace[':'.$c]="";
@@ -345,8 +348,6 @@ class DB extends Error{
         }
         else{
             $this->sql.=' '.$vals;
-
-
         }
         $this->sql=$this->sql.' '.$extra;
         
@@ -378,7 +379,6 @@ class DB extends Error{
         if(is_array($vals)){
             $c=count($this->replace);
             foreach($vals as $key=>$v){
-            	//if a function is detected, bypass the replacement
                 if(strstr($key,'/func')){
                     $this->sql.=str_replace('/func','',$key).'='.$v.', ';
                     unset($vals[$key]);
@@ -459,17 +459,19 @@ class DB extends Error{
     }
     
     // gets value of requested column
-    function get_value($table,$val,$where=false){
+    function get_value($table,$val,$where=false,$extra=''){
         $this->info->running=1;
         $this->info->func='$db->get_value';
         $this->info->vars=array('$table'=>$table,'$vals'=>$vals,'$where'=>$where);
         
         // run query
-        $o=$this->select($table,$val,$where);
+        $o=$this->select($table,$val,$where,$extra);
         
         // convert first object in associative array to array
         if($o)
             $v=get_object_vars($o[0]);
+        else
+            return false;
         
         // return requested value
         return $v[$val];
@@ -481,20 +483,18 @@ class DB extends Error{
         $this->info->func='$db->get_columns';
         $this->info->vars=array('$table'=>$table);
 
-        // temporarily change return type to get an array
-        $temp=$this->return_type;
-        $this->return_type='array';
+        //get no records
+        $this->sql='SELECT * FROM '.$table.' LIMIT 0';
+        $ret=$this->db->query($this->sql);
+
+        //no errors
+        $er=$this->get_sql_error(array('000000'));
         
-        $ret=$this->select_one($table,'*','','LIMIT 1');
-        
-        // change return type back
-        $this->return_type=$temp;
-        
-        // grab names
-        $fin=array();
-        foreach($ret as $key=>$r)
-            $fin[]=$key;
-            
+        //grab names
+        for ($i = 0; $i < $ret->columnCount(); $i++) {
+            $col = $ret->getColumnMeta($i);
+            $fin[] = $col['name'];
+        }
         return $fin;
     }
     
@@ -502,45 +502,37 @@ class DB extends Error{
     private function get_sql_error($error,$error_statement=''){
     // find the fail
         if($error)
-            $e=array($error[0],$error[1],'['.$error[0].'] '.$error[2]);
-
-
+			if(is_object($error))
+				$e=array('invalid','invalid','[invalid] ');
+			else
+				$e=array($error[0],$error[1],'['.$error[0].'] '.$error[2]);
         else
             $e=array('db error','',$error_statement);
         
         // catch any PDO errors and log them
         if($e[0]!='00000'){
             if($e[2])
-
-
-
-
-
-
-
-
                 $this->add_error($e[0],$e[2]);
             else
-
                 $this->add_error($e[0],'General Error upon execution');
-
         }
         
         if($this->debug || $this->debug_formatted)
-
             $this->_get_query($this->sql,$this->replace,$e);
         
         $this->info->func='';
         $this->info->vars=array();
-		if($e[0]=='00000')
+		if($e[0]=='00000'){
 			return false;
-		else
+        }
+		else{
+            $this->error_count++;
 			return true;
+        }
     }
     
     //debugging function
     private function _get_query($query,$val,$er=0){
-
         if($val)
         foreach($val as $key=>$value){
             if(strtolower($value)=='null')
@@ -548,19 +540,15 @@ class DB extends Error{
             else
                 $query=str_replace('='.$key,"='".$value."'",$query);
         }
-
         if($er){
-
 			if($er[0]!='00000'){
 				$error=$er[2];
                 $pass=false;
             }
-
 			else{
 				$error= 'no error';
                 $pass=true;
             }
-
         }
         $html= '';
         $html.= '<strong>QUERY:</strong><br />'.$query;
@@ -576,9 +564,9 @@ class DB extends Error{
         $html.= '<br />$db->replace: '.print_r($this->replace,true);
         $html.= '</pre>';
         
-        $this->_show_debug($this->info->func,$html,$pass);
+        $this->_set_debug($this->info->func,$html,$pass);
     }
-    function _show_debug($title,$content,$pass=true){
+    private function _set_debug($title,$content,$pass=true){
         $html='';
         
         if(!$this->debug_formatted){
@@ -590,13 +578,20 @@ class DB extends Error{
                 $html.='<div style="background-color:#CCFFCC"><h2 style="background-color:#00C200;color:#fff;">'.$title.'</h2>';
             else
                 $html.='<div style="background-color:#FFDDDD"><h2 style="background-color:#C20000;color:#fff;">'.$title.'</h2>';
-
-
             $html.=$content;
             $html.= '</div><hr />';
         }
-        echo $html;
+        $this->debug_output=$html;
     }
+	
+	function _get_debug(){
+		return $this->debug_output;
+	}
+	
+	function _show_debug(){
+		echo $this->debug_output;
+	}
 }
+
 
 ?>
