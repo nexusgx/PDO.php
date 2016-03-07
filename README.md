@@ -82,6 +82,9 @@ $database->rowsAffected=0;
 //change the return type from 'object' to 'array'
 $database->return_type='object';
 
+//error count
+$database->error_count;
+
 //turn on debugging
 $database->debug=true; //plain text
 $database->debug_formatted=true; //html
