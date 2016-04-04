@@ -71,6 +71,10 @@ $database->query("SELECT * FROM MyDatabaseTable WHERE id=1");
 //securely run your own query
 $database->query("SELECT * FROM MyDatabaseTable WHERE id=:id",array(':id'=>1));
 
+//reset your database connection; the parameters can be changed to new values if desired with a fallback to the defaults
+$database->reconnect(array('name'=>DB_NAME,'user'=>DB_USER,'password'=>DB_PASS,'host'=>DB_HOST));
+
+
 //------------PROPERTIES
 
 //the last inserted id
