@@ -27,24 +27,49 @@ class DB extends Error{
     public $debug_formatted=false;
     public $debug=false;
     public $lastInsertId='0';
-	public $rowsAffected=0;
+    public $rowsAffected=0;
     public $error_count=0;
     public $return_type='object';
     public $raw=false; //disable prep_vars
     
     
     // initialize connection
-    function __construct(){
+    function __construct($params=''){
+        $this->reconnect($params);
+        $this->info=new stdClass();
+    }
+    
+    //disconnect and reconnect to the database
+    function reconnect($params=''){
+        $connect=array(
+            'name'=>DB_NAME,
+            'password'=>DB_PASS,
+            'user'=>DB_USER,
+            'host'=>DB_HOST
+        );
+        
+        //override connection defaults if necessary
+        if(is_array($params)){
+            if(isset($params['name']))$connect['name']=$params['name'];
+            if(isset($params['password']))$connect['password']=$params['password'];
+            if(isset($params['user']))$connect['user']=$params['user'];
+            if(isset($params['host']))$connect['host']=$params['host'];
+        }
+        
+        //close the existing database connection
+        if($this->db!==null)
+            $this->db=null;
+        
+        //connect to the database or die trying
         try {
-            $dsn="mysql:dbname=".DB_NAME.";host=".DB_HOST;
-            $this->db = new PDO($dsn, DB_USER, DB_PASS);
+            $dsn="mysql:dbname=".$connect['name'].";host=".$connect['host'];
+            $this->db = new PDO($dsn, $connect['user'], $connect['password']);
             $this->db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
             $this->db->query('SET NAMES GBK');
         } catch (PDOException $e) {
             print "Error!: " . $e->getMessage() . "<br/>";
             die();
         }
-        $this->info=new stdClass();
     }
     
     // initialize the sql query
