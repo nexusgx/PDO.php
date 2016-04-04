@@ -11,14 +11,14 @@ Requires PHP 5.3 or later.
 Usage
 ===
 `````php
-//assigning my database information
+//assigning my default database information
 define('DB_HOST','MyHost');
 define('DB_USER','MyUsername');
 define('DB_PASS','MyPassword');
 define('DB_NAME','MyDatabase');
 
-//instantiate class
-$database = new DB();
+//instantiate class; if no array is provided, the defaults are used
+$database = new DB(array('name'=>DB_NAME,'user'=>DB_USER,'password'=>DB_PASS,'host'=>DB_HOST));
 
 
 //------------METHODS
